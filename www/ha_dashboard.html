@@ -153,16 +153,7 @@ body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--t
 .sc-bar{height:4px;border-radius:2px;background:var(--surface);margin-top:10px;overflow:hidden}
 .sc-fill{height:100%;border-radius:2px;transition:width .6s ease}
 
-/* ALARM */
-.alm{text-align:center;padding:22px}
-.alm-ic{font-size:2.2rem;margin-bottom:6px}
-.alm-st{font-size:1.1rem;font-weight:700;margin-bottom:3px}
-.alm-mo{font-size:.75rem;color:var(--text2)}
-.alm-act{display:flex;gap:8px;margin-top:14px;justify-content:center}
-.alm-btn{padding:8px 22px;border-radius:20px;border:none;font-size:.75rem;font-weight:600;cursor:pointer;transition:var(--t);font-family:inherit}
-.alm-btn.a{background:var(--green);color:#000}
-.alm-btn.d{background:var(--red);color:#fff}
-.alm-btn:hover{opacity:.85;transform:scale(1.03)}
+
 
 /* NET */
 .nd{display:flex;align-items:center;gap:12px}
@@ -287,7 +278,6 @@ let ws,mid=0,states={},tab='overview',token=CFG.token;
 
 const E={
   weather:'weather.forecast_home',
-  alarm:'alarm_control_panel.headend_ivan_car_alarm_manager',
   sun:'sun.sun',
   cameras:[
     {id:'camera.front_door_high_resolution_channel',name:'Front Door',icon:'mdi:doorbell-video'},
@@ -517,10 +507,8 @@ function renderTabs(){
 
 function renderOverview(){
   const c=document.createElement('div');
-  // Alarm + Quick Actions
-  const row=document.createElement('div');row.className='g g2';
-  row.appendChild(renderAlarm());row.appendChild(renderScenes());
-  c.appendChild(row);
+  // Quick Actions
+  c.appendChild(renderScenes());
   // Active media
   const active=E.media.filter(m=>states[m.id]?.state==='playing');
   if(active.length){
@@ -601,7 +589,6 @@ function renderNetwork(){
 function renderCar(){
   const c=document.createElement('div');
   const g=document.createElement('div');g.className='g g2';
-  g.appendChild(renderAlarm());
   const card=document.createElement('div');card.className='card';
   const cs=states['sensor.ivan_car_state'];
   const st=states['sensor.ivan_car_storage_utilization'];
@@ -740,17 +727,6 @@ function renderSensor(sensor){
   return card;
 }
 
-function renderAlarm(){
-  const card=document.createElement('div');card.className='card alm';
-  const a=states[E.alarm];const st=a?.state||'unknown';const dis=st==='disarmed';
-  card.innerHTML=`
-    <div class="alm-ic">${dis?'🔓':'🔒'}</div>
-    <div class="alm-st" style="color:${dis?'var(--text2)':'var(--green)'}">${st.toUpperCase()}</div>
-    <div class="alm-mo">Car Alarm</div>
-    <div class="alm-act"><button class="alm-btn a" onclick="call('alarm_control_panel','alarm_arm_away','${E.alarm}')">Arm Away</button><button class="alm-btn d" onclick="call('alarm_control_panel','alarm_disarm','${E.alarm}')">Disarm</button></div>`;
-  return card;
-}
-
 function renderScenes(){
   const card=document.createElement('div');card.className='card';
   card.innerHTML=`
@@ -758,8 +734,6 @@ function renderScenes(){
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
       <button class="lc-btn" onclick="call('scene','turn_on','scene.default_baseboard_on')" style="display:flex;align-items:center;justify-content:center;gap:6px"><i class="mdi mdi-radiator"></i>Baseboard</button>
       <button class="lc-btn" onclick="call('script','turn_on','script.purple_lights')" style="display:flex;align-items:center;justify-content:center;gap:6px"><i class="mdi mdi-lightbulb-on" style="color:var(--purple)"></i>Purple</button>
-      <button class="lc-btn" onclick="call('alarm_control_panel','alarm_arm_away','${E.alarm}')" style="display:flex;align-items:center;justify-content:center;gap:6px"><i class="mdi mdi-shield-car"></i>Arm Car</button>
-      <button class="lc-btn" onclick="call('alarm_control_panel','alarm_disarm','${E.alarm}')" style="display:flex;align-items:center;justify-content:center;gap:6px"><i class="mdi mdi-shield-off"></i>Disarm</button>
     </div>`;
   return card;
 }
@@ -787,8 +761,6 @@ function updateCard(eid){
   }else if(eid.includes('_state')){
     const def=E.network.find(n=>n.id===eid);
     if(def){const nc=renderNet(def);card.replaceWith(nc)}
-  }else if(eid===E.alarm){
-    const nc=renderAlarm();card.replaceWith(nc)
   }else if(eid===E.weather){
     // Weather bar re-render would go here
   }
