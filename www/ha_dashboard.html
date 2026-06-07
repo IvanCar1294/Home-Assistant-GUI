@@ -649,27 +649,29 @@ function renderSleepCard(name,ents,color){
   return card;
 }
 
+function renderWLEDCard(w){
+  const card=document.createElement('div');card.className='card';card.id=`c-${w.id}`;
+  const s=states[w.id];const on=s?.state==='on';
+  const intId=w.id.replace('light.','number.')+'_intensity';
+  const spdId=w.id.replace('light.','number.')+'_speed';
+  const preId=w.id.replace('light.','select.')+'_preset';
+  const palId=w.id.replace('light.','select.')+'_color_palette';
+  const intv=states[intId]?.state||128;const spdv=states[spdId]?.state||128;
+  const prev=states[preId]?.state||'--';const palv=states[palId]?.state||'--';
+  card.innerHTML=`
+    <div class="card-h"><div class="card-t">${w.name}</div><div class="card-ic" style="background:${on?'var(--yellow-g)':'var(--surface)'};color:${on?'var(--yellow)':'var(--text3)'}"><i class="mdi mdi-led-strip-variant"></i></div></div>
+    <div class="wled-prv" style="opacity:${on?1:.25}"></div>
+    <div style="font-size:.72rem;color:var(--text2);margin-bottom:10px">${prev} • ${palv}</div>
+    <button class="lc-btn" onclick="call('light','${on?'turn_off':'turn_on'}','${w.id}')" style="width:100%;margin-bottom:10px">${on?'Turn Off':'Turn On'}</button>
+    <div style="font-size:.68rem;color:var(--text3);margin-bottom:4px">Intensity: ${intv}</div>
+    <input type="range" class="wled-sl" min="0" max="255" value="${intv}" onchange="send({type:'call_service',domain:'number',service:'set_value',service_data:{entity_id:'${intId}',value:parseInt(this.value)}})">`;
+  return card;
+}
+
 function renderWLED(){
   const c=document.createElement('div');
   const g=document.createElement('div');g.className='g g2';
-  E.wled.forEach(w=>{
-    const card=document.createElement('div');card.className='card';
-    const s=states[w.id];const on=s?.state==='on';
-    const intId=w.id.replace('light.','number.')+'_intensity';
-    const spdId=w.id.replace('light.','number.')+'_speed';
-    const preId=w.id.replace('light.','select.')+'_preset';
-    const palId=w.id.replace('light.','select.')+'_color_palette';
-    const intv=states[intId]?.state||128;const spdv=states[spdId]?.state||128;
-    const prev=states[preId]?.state||'--';const palv=states[palId]?.state||'--';
-    card.innerHTML=`
-      <div class="card-h"><div class="card-t">${w.name}</div><div class="card-ic" style="background:${on?'var(--yellow-g)':'var(--surface)'};color:${on?'var(--yellow)':'var(--text3)'}"><i class="mdi mdi-led-strip-variant"></i></div></div>
-      <div class="wled-prv" style="opacity:${on?1:.25}"></div>
-      <div style="font-size:.72rem;color:var(--text2);margin-bottom:10px">${prev} • ${palv}</div>
-      <button class="lc-btn" onclick="call('light','${on?'turn_off':'turn_on'}','${w.id}')" style="width:100%;margin-bottom:10px">${on?'Turn Off':'Turn On'}</button>
-      <div style="font-size:.68rem;color:var(--text3);margin-bottom:4px">Intensity: ${intv}</div>
-      <input type="range" class="wled-sl" min="0" max="255" value="${intv}" onchange="send({type:'call_service',domain:'number',service:'set_value',service_data:{entity_id:'${intId}',value:parseInt(this.value)}})">`;
-    g.appendChild(card);
-  });
+  E.wled.forEach(w=>g.appendChild(renderWLEDCard(w)));
   c.appendChild(g);
   return c;
 }
@@ -679,8 +681,14 @@ function renderCamCard(cam){
   const card=document.createElement('div');card.className='card cam';card.id=`c-${cam.id}`;
   const s=states[cam.id];const rec=s?.state==='recording';const ok=s?.state!=='unavailable';
   const pic=s?.attributes?.entity_picture||'';
+  const token=s?.attributes?.access_token||'';
+  // Use camera_proxy with token for authenticated snapshot, or HLS stream
+  const snapUrl=pic?`${CFG.rest}${pic}`:'';
+  const streamUrl=token?`${CFG.rest}/api/camera_proxy_stream/${cam.id}?token=${token}`:'';
   card.innerHTML=`
-    <div class="cam-f">${rec?'<div class="cam-rec"></div>':''}${pic?('<img src="'+CFG.rest+pic+'&_='+Date.now()+'" alt="'+cam.name+'" onerror="this.style.display=\'none\'">'):'<i class="mdi mdi-camera-off" style="font-size:2rem;color:var(--text3)"></i>'}
+    <div class="cam-f" id="camf-${cam.id}">
+      ${rec?'<div class="cam-rec"></div>':''}
+      ${streamUrl?`<video autoplay muted playsinline poster="${snapUrl}" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none';this.parentElement.querySelector('.cam-fb').style.display='flex'"><source src="${streamUrl}" type="application/x-mpegURL"></video><div class="cam-fb" style="display:none;position:absolute;inset:0;align-items:center;justify-content:center"><img src="${snapUrl}&_=${Date.now()}" alt="${cam.name}" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none'"></div>`:`<img src="${snapUrl}&_=${Date.now()}" alt="${cam.name}" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none'">`}
       <div class="cam-ov"><span class="cam-n">${cam.name}</span><span class="cam-st ${ok?'':'off'}">${rec?'● Recording':ok?'● Live':'○ Offline'}</span></div>
     </div>`;
   return card;
@@ -701,9 +709,12 @@ function renderMediaCard(media){
   const card=document.createElement('div');card.className='card mc';card.id=`c-${media.id}`;
   const s=states[media.id];const play=s?.state==='playing';const on=s?.state==='on';
   const ok=s?.state!=='unavailable';const fn=s?.attributes?.friendly_name||media.name;
+  const vol=s?.attributes?.volume_level;const muted=s?.attributes?.is_volume_muted;
+  const volPct=vol!==undefined?Math.round(vol*100):50;
   card.innerHTML=`
     <div class="mc-top"><div class="mc-art"><i class="mdi ${media.icon}"></i></div><div class="mc-info"><div class="mc-n">${fn}</div><div class="mc-st ${play?'play':''}">${play?'▶ Playing':on?'● On':ok?s?.state:'○ Unavailable'}</div></div></div>
-    ${ok?`<div class="mc-ctrl"><button class="mc-btn" onclick="call('media_player','media_previous_track','${media.id}')"><i class="mdi mdi-skip-previous"></i></button><button class="mc-btn ${play?'p':''}" onclick="call('media_player','${play?'media_pause':'media_play'}','${media.id}')"><i class="mdi ${play?'mdi-pause':'mdi-play'}"></i></button><button class="mc-btn" onclick="call('media_player','media_next_track','${media.id}')"><i class="mdi mdi-skip-next"></i></button><button class="mc-btn" onclick="call('media_player','${on?'turn_off':'turn_on'}','${media.id}')"><i class="mdi mdi-power"></i></button></div>`:''}`;
+    ${ok?`<div class="mc-ctrl"><button class="mc-btn" onclick="call('media_player','media_previous_track','${media.id}')"><i class="mdi mdi-skip-previous"></i></button><button class="mc-btn ${play?'p':''}" onclick="call('media_player','${play?'media_pause':'media_play'}','${media.id}')"><i class="mdi ${play?'mdi-pause':'mdi-play'}"></i></button><button class="mc-btn" onclick="call('media_player','media_next_track','${media.id}')"><i class="mdi mdi-skip-next"></i></button><button class="mc-btn" onclick="call('media_player','${on?'turn_off':'turn_on'}','${media.id}')"><i class="mdi mdi-power"></i></button></div>
+    <div style="display:flex;align-items:center;gap:8px;margin-top:10px;padding:0 4px"><button class="mc-btn" style="width:28px;height:28px;font-size:.7rem" onclick="call('media_player','${muted?'volume_unmute':'volume_mute'}','${media.id}')"><i class="mdi ${muted?'mdi-volume-off':'mdi-volume-high'}"></i></button><input type="range" class="wled-sl" min="0" max="100" value="${volPct}" onchange="send({type:'call_service',domain:'media_player',service:'volume_set',service_data:{entity_id:'${media.id}',volume_level:this.value/100}})"><span style="font-family:'JetBrains Mono',monospace;font-size:.68rem;color:var(--text3);min-width:32px;text-align:right">${volPct}%</span></div>`:''}`;
   return card;
 }
 
@@ -758,18 +769,28 @@ function updateCard(eid){
   const card=document.getElementById(`c-${eid}`);
   if(!card)return;
   if(eid.startsWith('light.')){
+    // Check if this is a WLED light (custom card)
+    const wledDef=E.wled.find(w=>w.id===eid);
+    if(wledDef){
+      const nc=renderWLEDCard(wledDef);
+      card.replaceWith(nc);
+      return;
+    }
     const def=E.lights.find(l=>l.id===eid);
     if(def){const nc=renderLightCard(def);card.replaceWith(nc)}
   }else if(eid.startsWith('media_player.')){
     const def=E.media.find(m=>m.id===eid);
     if(def){const nc=renderMediaCard(def);card.replaceWith(nc)}
+  }else if(eid.startsWith('camera.')){
+    const def=E.cameras.find(c=>c.id===eid);
+    if(def){const nc=renderCamCard(def);card.replaceWith(nc)}
   }else if(eid.includes('_state')){
     const def=E.network.find(n=>n.id===eid);
     if(def){const nc=renderNet(def);card.replaceWith(nc)}
   }else if(eid===E.alarm){
     const nc=renderAlarm();card.replaceWith(nc)
   }else if(eid===E.weather){
-    // Re-render weather bar
+    // Weather bar re-render would go here
   }
 }
 
