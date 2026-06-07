@@ -680,7 +680,7 @@ function renderCamCard(cam){
   const s=states[cam.id];const rec=s?.state==='recording';const ok=s?.state!=='unavailable';
   const pic=s?.attributes?.entity_picture||'';
   card.innerHTML=`
-    <div class="cam-f">${rec?'<div class="cam-rec"></div>':''}${pic?`<img src="${CFG.restUrl}${pic}&_=${Date.now()}" alt="${cam.name}" onerror="this.style.display='none'">`:'<i class="mdi mdi-camera-off" style="font-size:2rem;color:var(--text3)"></i>'}
+    <div class="cam-f">${rec?'<div class="cam-rec"></div>':''}${pic?('<img src="'+CFG.rest+pic+'&_='+Date.now()+'" alt="'+cam.name+'" onerror="this.style.display=\'none\'">'):'<i class="mdi mdi-camera-off" style="font-size:2rem;color:var(--text3)"></i>'}
       <div class="cam-ov"><span class="cam-n">${cam.name}</span><span class="cam-st ${ok?'':'off'}">${rec?'● Recording':ok?'● Live':'○ Offline'}</span></div>
     </div>`;
   return card;
